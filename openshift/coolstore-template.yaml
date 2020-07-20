@@ -50,6 +50,7 @@ objects:
       type: Git
     strategy:
       sourceStrategy:
+        forcePull: true
         env:
         - name: NPM_MIRROR
           value: ${NPM_MIRROR}
@@ -183,12 +184,12 @@ objects:
       type: Git
     strategy:
       sourceStrategy:
+        forcePull: true
         env:
         - name: MAVEN_ARGS
           value: package -DskipTests -Dfabric8.skip -e -B -Pearly-access-repo
         - name: MAVEN_MIRROR_URL
           value: ${MAVEN_MIRROR_URL}
-        forcePull: true
         from:
           kind: ImageStreamTag
           name: fis-java-openshift:2.0
@@ -307,6 +308,7 @@ objects:
       type: Git
     strategy:
       sourceStrategy:
+        forcePull: true
         env:
         - name: MAVEN_MIRROR_URL
           value: ${MAVEN_MIRROR_URL}
@@ -544,6 +546,7 @@ objects:
       type: Git
     strategy:
       sourceStrategy:
+        forcePull: true
         env:
         - name: MAVEN_MIRROR_URL
           value: ${MAVEN_MIRROR_URL}
@@ -783,6 +786,7 @@ objects:
       type: Git
     strategy:
       sourceStrategy:
+        forcePull: true
         env:
         - name: MAVEN_MIRROR_URL
           value: ${MAVEN_MIRROR_URL}
@@ -1058,6 +1062,7 @@ objects:
       type: Git
     strategy:
       sourceStrategy:
+        forcePull: true
         env:
         - name: MAVEN_MIRROR_URL
           value: ${MAVEN_MIRROR_URL}
@@ -1193,6 +1198,7 @@ objects:
       type: Git
     strategy:
       sourceStrategy:
+        forcePull: true
         env:
         - name: KIE_CONTAINER_DEPLOYMENT
           value: ${KIE_CONTAINER_DEPLOYMENT}
@@ -1348,6 +1354,7 @@ objects:
       type: Git
     strategy:
       sourceStrategy:
+        forcePull: true
         env:
         - name: MAVEN_MIRROR_URL
           value: ${MAVEN_MIRROR_URL}
