@@ -271,7 +271,6 @@ objects:
       variant: green
     name: inventory
   spec:
-    host: inventory
     alternateBackends:
     - name: inventory-green
       weight: 0
