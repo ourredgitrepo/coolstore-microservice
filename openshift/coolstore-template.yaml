@@ -290,157 +290,6 @@ objects:
     tags:
     - name: latest
 - apiVersion: v1
-  kind: BuildConfig
-  metadata:
-    name: inventory
-    labels:
-      app: inventory
-  spec:
-    output:
-      to:
-        kind: ImageStreamTag
-        name: inventory:latest
-    source:
-      contextDir: inventory-service
-      git:
-        ref: ${GIT_REF}
-        uri: ${GIT_URI}
-      type: Git
-    strategy:
-      sourceStrategy:
-        forcePull: true
-        env:
-        - name: MAVEN_MIRROR_URL
-          value: ${MAVEN_MIRROR_URL}
-        from:
-          kind: ImageStreamTag
-          name: jboss-eap70-openshift:1.5
-          namespace: ${IMAGE_STREAM_NAMESPACE}
-      type: Source
-    triggers:
-    - type: ConfigChange
-    - imageChange: {}
-      type: ImageChange
-- apiVersion: v1
-  kind: DeploymentConfig
-  metadata:
-    name: inventory
-    labels:
-      app: inventory
-  spec:
-    replicas: 1
-    selector:
-      deploymentconfig: inventory
-    strategy:
-      resources: {}
-      type: Recreate
-    template:
-      metadata:
-        labels:
-          app: inventory
-          deploymentconfig: inventory
-        name: inventory
-      spec:
-        containers:
-        - env:
-          - name: OPENSHIFT_KUBE_PING_LABELS
-            value: application=inventory
-          - name: OPENSHIFT_KUBE_PING_NAMESPACE
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.namespace
-          - name: MQ_CLUSTER_PASSWORD
-            value: 7mzX0pLV03
-          - name: JGROUPS_CLUSTER_PASSWORD
-            value: CqUo3fYDTv
-          - name: AUTO_DEPLOY_EXPLODED
-            value: "false"
-          - name: DB_SERVICE_PREFIX_MAPPING
-            value: inventory-postgresql=DB
-          - name: DB_JNDI
-            value: java:jboss/datasources/InventoryDS
-          - name: DB_USERNAME
-            value: ${INVENTORY_DB_USERNAME}
-          - name: DB_PASSWORD
-            value: ${INVENTORY_DB_PASSWORD}
-          - name: DB_DATABASE
-            value: inventorydb
-          image: inventory
-          imagePullPolicy: Always
-          lifecycle:
-            preStop:
-              exec:
-                command:
-                - /opt/eap/bin/jboss-cli.sh
-                - -c
-                - :shutdown(timeout=60)
-          livenessProbe:
-            failureThreshold: 10
-            httpGet:
-              path: /
-              port: 8080
-              scheme: HTTP
-            initialDelaySeconds: 60
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 5
-          name: inventory
-          ports:
-          - containerPort: 8778
-            name: jolokia
-            protocol: TCP
-          - containerPort: 8080
-            name: http
-            protocol: TCP
-          - containerPort: 8888
-            name: ping
-            protocol: TCP
-          readinessProbe:
-            failureThreshold: 10
-            httpGet:
-              path: /
-              port: 8080
-              scheme: HTTP
-            initialDelaySeconds: 60
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 1
-          resources:
-            limits:
-              memory: 1Gi
-            requests:
-              memory: 512Mi
-          terminationMessagePath: /dev/termination-log
-        dnsPolicy: ClusterFirst
-        restartPolicy: Always
-        securityContext: {}
-        terminationGracePeriodSeconds: 75
-    triggers:
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - inventory
-        from:
-          kind: ImageStreamTag
-          name: inventory:latest
-      type: ImageChange
-    - type: ConfigChange
-- apiVersion: v1
-  kind: Service
-  metadata:
-    annotations:
-      service.alpha.openshift.io/dependencies: '[{"name":"inventory-postgresql","namespace":"","kind":"Service"}]'
-    labels:
-      app: inventory
-    name: inventory
-  spec:
-    ports:
-    - port: 8080
-      protocol: TCP
-      targetPort: 8080
-    selector:
-      deploymentconfig: inventory
-- apiVersion: v1
   kind: DeploymentConfig
   metadata:
     name: inventory-postgresql
@@ -483,6 +332,8 @@ objects:
             tcpSocket:
               port: 5432
             timeoutSeconds: 1
+            failureThreshold: 10
+            periodSeconds: 10
           readinessProbe:
             exec:
               command:
@@ -492,10 +343,20 @@ objects:
               - psql -h 127.0.0.1 -U $POSTGRESQL_USER -q -d $POSTGRESQL_DATABASE -c 'SELECT 1'
             initialDelaySeconds: 5
             timeoutSeconds: 1
+            failureThreshold: 10
+            periodSeconds: 5
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 50m
+              memory: 256Mi
         terminationGracePeriodSeconds: 60
         volumes:
         - name: inventory-postgresql-data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: inventory-postgresql-pv
     triggers:
     - imageChangeParams:
         automatic: true
@@ -503,7 +364,7 @@ objects:
         - inventory-postgresql
         from:
           kind: ImageStreamTag
-          name: postgresql:latest
+          name: postgresql:9.6
           namespace: ${IMAGE_STREAM_NAMESPACE}
       type: ImageChange
     - type: ConfigChange
@@ -519,6 +380,18 @@ objects:
       targetPort: 5432
     selector:
       deploymentconfig: inventory-postgresql
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    labels:
+      app: inventory
+    name: inventory-postgresql-pv
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 512Mi
 # Catalog Service
 - apiVersion: v1
   kind: ImageStream
@@ -1811,15 +1684,13 @@ parameters:
   name: BOWER_MIRROR
 - description: Inventory Service database user name
   displayName: Inventory Database username
-  from: user[a-zA-Z0-9]{3}
-  generate: expression
   name: INVENTORY_DB_USERNAME
+  value: invUser
   required: true
 - description: Inventory Service database user password
   displayName: Inventory Database password
-  from: '[a-zA-Z0-9]{8}'
-  generate: expression
   name: INVENTORY_DB_PASSWORD
+  value: invPass
   required: true
 - description: Catalog Service database user name
   displayName: Catalog Database username

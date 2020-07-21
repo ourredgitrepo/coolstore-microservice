@@ -1,0 +1,144 @@
+apiVersion: v1
+kind: Template
+labels:
+  demo: coolstore-microservice
+  template: coolstore
+metadata:
+  annotations:
+    description: CoolStore demo microservices application template
+    iconClass: icon-java
+    tags: microservice,jboss,spring
+  name: coolstore
+message: "When using this template, the rating, review, turbine-server and hystrix-dashboard pods are slaced to zero by default to limit resource usage. Scale them up if you need these services or use the provisioning script instead."
+objects:
+# Inventory Service
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: inventory
+    labels:
+      app: inventory
+  spec:
+    replicas: 1
+    selector:
+      deploymentconfig: inventory
+    strategy:
+      resources: {}
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: inventory
+          deploymentconfig: inventory
+        name: inventory
+      spec:
+        containers:
+        - env:
+          - name: OPENSHIFT_KUBE_PING_LABELS
+            value: application=inventory
+          - name: OPENSHIFT_KUBE_PING_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: MQ_CLUSTER_PASSWORD
+            value: 7mzX0pLV03
+          - name: JGROUPS_CLUSTER_PASSWORD
+            value: CqUo3fYDTv
+          - name: AUTO_DEPLOY_EXPLODED
+            value: "false"
+          - name: DB_SERVICE_PREFIX_MAPPING
+            value: inventory-postgresql=DB
+          - name: DB_JNDI
+            value: java:jboss/datasources/InventoryDS
+          - name: DB_USERNAME
+            value: ${INVENTORY_DB_USERNAME}
+          - name: DB_PASSWORD
+            value: ${INVENTORY_DB_PASSWORD}
+          - name: DB_DATABASE
+            value: inventorydb
+          image: inventory
+          imagePullPolicy: Always
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                - /opt/eap/bin/jboss-cli.sh
+                - -c
+                - :shutdown(timeout=60)
+          livenessProbe:
+            failureThreshold: 10
+            httpGet:
+              path: /
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          name: inventory
+          ports:
+          - containerPort: 8778
+            name: jolokia
+            protocol: TCP
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+          - containerPort: 8888
+            name: ping
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 10
+            httpGet:
+              path: /
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              memory: 1Gi
+            requests:
+              memory: 512Mi
+          terminationMessagePath: /dev/termination-log
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        securityContext: {}
+        terminationGracePeriodSeconds: 75
+    triggers:
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - inventory
+        from:
+          kind: ImageStreamTag
+          name: inventory:test
+      type: ImageChange
+    - type: ConfigChange
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.alpha.openshift.io/dependencies: '[{"name":"inventory-postgresql","namespace":"","kind":"Service"}]'
+    labels:
+      app: inventory
+    name: inventory
+  spec:
+    ports:
+    - port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      deploymentconfig: inventory
+parameters:
+- description: Inventory Service database user name
+  displayName: Inventory Database username
+  name: INVENTORY_DB_USERNAME
+  value: invUser
+  required: true
+- description: Inventory Service database user password
+  displayName: Inventory Database password
+  name: INVENTORY_DB_PASSWORD
+  value: invPass
+  required: true
